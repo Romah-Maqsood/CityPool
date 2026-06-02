@@ -1,12 +1,12 @@
-// src/components/Checkbox.js
 import React from 'react';
 import {
-  TouchableOpacity,
+  Pressable,
   Text,
   StyleSheet,
   View,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/colors';
+import AppIcon from './common/AppIcon';
 
 const Checkbox = ({
   checked,
@@ -15,13 +15,16 @@ const Checkbox = ({
   onLinkPress,
 }) => {
   return (
-    <TouchableOpacity
+    <Pressable
       style={styles.container}
       onPress={onPress}
-      activeOpacity={0.7}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
     >
       <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-        {checked && <Text style={styles.checkmark}>✓</Text>}
+        {checked ? (
+          <AppIcon name="check" size={14} color={colors.onSecondary} />
+        ) : null}
       </View>
       <Text style={styles.label}>
         {label}
@@ -34,41 +37,38 @@ const Checkbox = ({
         </Text>
         <Text style={styles.label}>.</Text>
       </Text>
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
     paddingVertical: spacing.sm,
+    marginBottom: spacing.xs,
   },
   checkbox: {
-    width: 20,
-    height: 20,
+    width: 22,
+    height: 22,
     borderRadius: borderRadius.sm,
     borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 1,
   },
   checkboxChecked: {
     backgroundColor: colors.secondary,
     borderColor: colors.secondary,
   },
-  checkmark: {
-    color: colors.onSecondary,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
   label: {
     ...typography.bodySmall,
     color: colors.onSurfaceVariant,
-    fontSize: 13,
-    lineHeight: 18,
+    flex: 1,
+    lineHeight: 20,
   },
   linkText: {
     color: colors.secondary,

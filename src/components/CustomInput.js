@@ -1,27 +1,35 @@
-// src/components/CustomInput.js
 import React, { useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
+  Platform,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/colors';
+import AppIcon from './common/AppIcon';
 
 const CustomInput = ({
   label,
   value,
   onChangeText,
   placeholder,
-  iconComponent,
+  iconName,
   secureTextEntry = false,
   keyboardType = 'default',
+  autoCapitalize,
   error = null,
   required = false,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const iconColor = error
+    ? colors.error
+    : isFocused
+      ? colors.secondary
+      : colors.onSurfaceVariant;
 
   return (
     <View style={styles.container}>
@@ -29,18 +37,20 @@ const CustomInput = ({
         {label}
         {required && <Text style={styles.requiredStar}> *</Text>}
       </Text>
-      
-      <View style={[
-        styles.inputContainer,
-        isFocused && styles.inputContainerFocused,
-        error && styles.inputContainerError,
-      ]}>
-        {iconComponent && (
+
+      <View
+        style={[
+          styles.inputContainer,
+          isFocused && styles.inputContainerFocused,
+          error && styles.inputContainerError,
+        ]}
+      >
+        {iconName ? (
           <View style={styles.leftIcon}>
-            {iconComponent}
+            <AppIcon name={iconName} size={20} color={iconColor} />
           </View>
-        )}
-        
+        ) : null}
+
         <TextInput
           style={styles.input}
           value={value}
@@ -49,18 +59,27 @@ const CustomInput = ({
           placeholderTextColor={colors.placeholder}
           secureTextEntry={secureTextEntry && !showPassword}
           keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
         />
-        
-        {secureTextEntry && (
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
-          </TouchableOpacity>
-        )}
+
+        {secureTextEntry ? (
+          <Pressable
+            onPress={() => setShowPassword(prev => !prev)}
+            hitSlop={8}
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+          >
+            <AppIcon
+              name={showPassword ? 'eyeOff' : 'eye'}
+              size={20}
+              color={colors.neutral}
+            />
+          </Pressable>
+        ) : null}
       </View>
-      
-      {error && <Text style={styles.errorText}>{error}</Text>}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 };
@@ -71,9 +90,8 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.labelLarge,
-    color: colors.onSurfaceVariant,
+    color: colors.onSurface,
     marginBottom: spacing.xs,
-    fontSize: 14,
     fontWeight: '500',
   },
   requiredStar: {
@@ -82,8 +100,8 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-    backgroundColor: colors.surface,
+    minHeight: 52,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: borderRadius.lg,
@@ -91,7 +109,7 @@ const styles = StyleSheet.create({
   },
   inputContainerFocused: {
     borderColor: colors.secondary,
-    borderWidth: 1.5,
+    backgroundColor: colors.surface,
   },
   inputContainerError: {
     borderColor: colors.error,
@@ -103,11 +121,8 @@ const styles = StyleSheet.create({
     flex: 1,
     ...typography.bodyMedium,
     color: colors.onSurface,
-    padding: 0,
-    fontSize: 16,
-  },
-  eyeIcon: {
-    fontSize: 20,
+    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
+    paddingHorizontal: 0,
   },
   errorText: {
     ...typography.bodySmall,

@@ -1,4 +1,3 @@
-// src/components/CustomButton.js
 import React from 'react';
 import {
   TouchableOpacity,
@@ -8,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../constants/colors';
+import AppIcon from './common/AppIcon';
 
 const CustomButton = ({
   title,
@@ -16,50 +16,80 @@ const CustomButton = ({
   size = 'large',
   loading = false,
   disabled = false,
-  iconComponent = null,
+  iconName = null,
   iconPosition = 'right',
+  style,
 }) => {
+  const isDisabled = disabled || loading;
+
   const getButtonStyle = () => {
-    let style = { backgroundColor: colors.secondary };
+    let buttonStyle = { backgroundColor: colors.secondary };
     if (variant === 'outline') {
-      style = { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.secondary };
+      buttonStyle = {
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderColor: colors.secondary,
+      };
     }
-    if (disabled || loading) {
-      style.backgroundColor = colors.neutral;
-      style.opacity = 0.6;
+    if (isDisabled) {
+      buttonStyle = {
+        ...buttonStyle,
+        backgroundColor: variant === 'outline' ? 'transparent' : colors.neutral,
+        opacity: 0.55,
+      };
     }
-    return style;
+    return buttonStyle;
   };
-  
-  const getTextStyle = () => {
-    return variant === 'outline' ? { color: colors.secondary } : { color: colors.onSecondary };
-  };
-  
+
+  const getTextStyle = () =>
+    variant === 'outline' ? { color: colors.secondary } : { color: colors.onSecondary };
+
   const getHeight = () => {
     switch (size) {
-      case 'small': return 40;
-      case 'medium': return 48;
-      default: return 52;
+      case 'small':
+        return 40;
+      case 'medium':
+        return 48;
+      default:
+        return 52;
     }
   };
-  
+
+  const iconColor = variant === 'outline' ? colors.secondary : colors.onSecondary;
+
   return (
     <TouchableOpacity
-      style={[styles.button, getButtonStyle(), { height: getHeight() }]}
+      style={[
+        styles.button,
+        getButtonStyle(),
+        { height: getHeight() },
+        style,
+      ]}
       onPress={onPress}
-      disabled={disabled || loading}
-      activeOpacity={0.8}
+      disabled={isDisabled}
+      activeOpacity={0.85}
     >
       {loading ? (
         <ActivityIndicator color={colors.onSecondary} />
       ) : (
         <View style={styles.buttonContent}>
+          {iconName && iconPosition === 'left' ? (
+            <AppIcon
+              name={iconName}
+              size={20}
+              color={iconColor}
+              style={styles.leftIcon}
+            />
+          ) : null}
           <Text style={[styles.text, getTextStyle()]}>{title}</Text>
-          {iconComponent && iconPosition === 'right' && (
-            <View style={styles.rightIcon}>
-              {iconComponent}
-            </View>
-          )}
+          {iconName && iconPosition === 'right' ? (
+            <AppIcon
+              name={iconName}
+              size={20}
+              color={iconColor}
+              style={styles.rightIcon}
+            />
+          ) : null}
         </View>
       )}
     </TouchableOpacity>
@@ -68,7 +98,7 @@ const CustomButton = ({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
@@ -82,6 +112,9 @@ const styles = StyleSheet.create({
     ...typography.labelLarge,
     fontWeight: '600',
     fontSize: 16,
+  },
+  leftIcon: {
+    marginRight: spacing.sm,
   },
   rightIcon: {
     marginLeft: spacing.sm,

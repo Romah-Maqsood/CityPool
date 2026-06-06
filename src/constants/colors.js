@@ -26,6 +26,8 @@ export const colors = {
   
   // Placeholder text color (Light grey)
   placeholder: '#9CA3AF',   // ✅ Light grey placeholder
+  border: '#E5E7EB',
+borderLight: '#F3F4F6',
 };
 
 export const typography = {
@@ -91,3 +93,4 @@ export const borderRadius = {
   xl: 16,
   full: 9999,
 };
+

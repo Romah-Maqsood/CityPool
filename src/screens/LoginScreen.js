@@ -37,6 +37,7 @@ const LoginScreen = ({ navigation }) => {
     setTimeout(() => {
       setIsLoading(false);
       console.log('Login with:', countryCode, phoneNumber);
+      navigation.navigate('RegisterVehicle');
     }, 1500);
   };
 

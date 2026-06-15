@@ -9,6 +9,9 @@ import VerifyIdentityScreen from '../screens/VerifyIdentityScreen';
 import PostRideScreen from '../screens/PostRideScreen';
 import HomeScreen from '../screens/HomeScreen';
 import RideDetailsScreen from '../screens/RideDetailsScreen';
+import RideConfirmedScreen from '../screens/RideConfirmedScreen';
+import ChatScreen from '../screens/ChatScreen';
+import GroupChatScreen from '../screens/GroupChatScreen';
 
 const Stack = createStackNavigator();
 
@@ -29,6 +32,9 @@ const AppNavigator = () => {
         <Stack.Screen name="PostRide" component={PostRideScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="RideDetails" component={RideDetailsScreen} />
+        <Stack.Screen name="RideConfirmed" component={RideConfirmedScreen} />
+        <Stack.Screen name="Chat" component={ChatScreen} />
+        <Stack.Screen name="GroupChat" component={GroupChatScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

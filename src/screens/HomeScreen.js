@@ -97,21 +97,34 @@ const RIDES = [
   },
 ];
 
-const SidePanel = ({ visible, onClose }) => {
+// ─── Side Panel ───────────────────────────────────────────────────────────────
+const SidePanel = ({ visible, onClose, navigation }) => {
   const insets = useSafeAreaInsets();
 
   const menuTop = [
-    { icon: 'history', label: 'Ride History' },
-    { icon: 'shield-check-outline', label: 'Verification' },
-    { icon: 'credit-card-outline', label: 'Payments' },
-  ];
-  const menuBottom = [
-    { icon: 'cog-outline', label: 'Settings' },
-    { icon: 'help-circle-outline', label: 'Help & Support' },
+    { icon: 'car-multiple',         label: 'My Rides',    screen: 'MyRides' },
+    { icon: 'history',              label: 'Ride History', screen: null      },
+    { icon: 'shield-check-outline', label: 'Verification', screen: null      },
+    // ── Payments now navigates to Wallet ──────────────────────────────────
+    { icon: 'credit-card-outline',  label: 'Payments',    screen: 'Wallet'  },
   ];
 
-  const MenuItem = ({ icon, label }) => (
-    <TouchableOpacity style={panelSt.menuItem} activeOpacity={0.7}>
+  const menuBottom = [
+    { icon: 'cog-outline',          label: 'Settings',     screen: null },
+    { icon: 'help-circle-outline',  label: 'Help & Support', screen: null },
+  ];
+
+  const MenuItem = ({ icon, label, screen }) => (
+    <TouchableOpacity
+      style={panelSt.menuItem}
+      activeOpacity={0.7}
+      onPress={() => {
+        if (screen) {
+          onClose();
+          navigation.navigate(screen);
+        }
+      }}
+    >
       <IconMCI name={icon} size={22} color={C.primary} />
       <Text style={panelSt.menuLabel}>{label}</Text>
     </TouchableOpacity>
@@ -122,6 +135,7 @@ const SidePanel = ({ visible, onClose }) => {
       <View style={panelSt.overlay}>
         <Pressable style={panelSt.backdrop} onPress={onClose} />
         <View style={[panelSt.panel, { paddingBottom: insets.bottom || 24 }]}>
+
           <View style={[panelSt.header, { paddingTop: insets.top + 24 }]}>
             <TouchableOpacity onPress={onClose} style={panelSt.closeBtn}>
               <Icon name="close" size={22} color={C.white} />
@@ -146,7 +160,7 @@ const SidePanel = ({ visible, onClose }) => {
 
           <View style={panelSt.menuSection}>
             {menuTop.map(item => (
-              <MenuItem key={item.label} icon={item.icon} label={item.label} />
+              <MenuItem key={item.label} icon={item.icon} label={item.label} screen={item.screen} />
             ))}
           </View>
 
@@ -154,7 +168,7 @@ const SidePanel = ({ visible, onClose }) => {
 
           <View style={panelSt.menuSection}>
             {menuBottom.map(item => (
-              <MenuItem key={item.label} icon={item.icon} label={item.label} />
+              <MenuItem key={item.label} icon={item.icon} label={item.label} screen={item.screen} />
             ))}
           </View>
 
@@ -167,6 +181,7 @@ const SidePanel = ({ visible, onClose }) => {
               <Text style={panelSt.logoutText}>Logout</Text>
             </TouchableOpacity>
           </View>
+
         </View>
       </View>
     </Modal>
@@ -177,12 +192,15 @@ const panelSt = StyleSheet.create({
   overlay: { flex: 1, flexDirection: 'row' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   panel: {
-    width: PANEL_W, backgroundColor: C.white,
-    position: 'absolute', left: 0, top: 0, bottom: 0,
+    width: PANEL_W,
+    backgroundColor: C.white,
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
   },
   header: {
     backgroundColor: C.darkCard,
-    paddingHorizontal: 20, paddingBottom: 28,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
     position: 'relative',
   },
   closeBtn: { position: 'absolute', top: 16, right: 16, padding: 4, zIndex: 10 },
@@ -202,14 +220,23 @@ const panelSt = StyleSheet.create({
     gap: 16, borderRadius: 10,
   },
   menuLabel: { fontSize: 15, color: C.dark, fontWeight: '500' },
-  sectionDivider: { height: 1, backgroundColor: C.lightBlue, marginHorizontal: 16, marginVertical: 4 },
+  sectionDivider: {
+    height: 1, backgroundColor: C.lightBlue,
+    marginHorizontal: 16, marginVertical: 4,
+  },
   logoutSection: { paddingBottom: 8 },
-  logoutDivider: { height: 1, backgroundColor: C.lightBlue, marginHorizontal: 16, marginBottom: 8 },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 24 },
+  logoutDivider: {
+    height: 1, backgroundColor: C.lightBlue,
+    marginHorizontal: 16, marginBottom: 8,
+  },
+  logoutBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 14, paddingVertical: 14, paddingHorizontal: 24,
+  },
   logoutText: { fontSize: 15, color: C.red, fontWeight: '600' },
 });
 
-// RideCard with navigation to RideDetails
+// ─── Ride Card ────────────────────────────────────────────────────────────────
 const RideCard = ({ ride, navigation }) => (
   <View style={[cardSt.card, { backgroundColor: ride.cardBg }]}>
 
@@ -256,6 +283,14 @@ const RideCard = ({ ride, navigation }) => (
           <Text style={cardSt.carText}>{ride.car} • {ride.color}</Text>
         </View>
       </View>
+
+      <TouchableOpacity
+        style={cardSt.chatBtn}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('GroupChat')}
+      >
+        <IconMCI name="message-text-outline" size={20} color={C.primary} />
+      </TouchableOpacity>
     </View>
 
     <View style={cardSt.timeRow}>
@@ -277,7 +312,6 @@ const RideCard = ({ ride, navigation }) => (
         <Text style={cardSt.price}>{ride.price}</Text>
         <Text style={cardSt.seats}>{ride.seats}</Text>
       </View>
-      {/* Navigate to RideDetails on Book Now click */}
       <TouchableOpacity
         style={cardSt.bookBtn}
         activeOpacity={0.85}
@@ -336,6 +370,12 @@ const cardSt = StyleSheet.create({
   phoneTagText: { fontSize: 10, color: C.mutedText, fontWeight: '600' },
   carRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   carText: { fontSize: 12, color: C.mutedText },
+  chatBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: C.cnicBg,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
   timeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   timeBlock: { alignItems: 'flex-start' },
   time: { fontSize: 20, fontWeight: '800', color: C.dark },
@@ -350,6 +390,7 @@ const cardSt = StyleSheet.create({
   bookBtnText: { fontSize: 14, fontWeight: '700', color: C.white },
 });
 
+// ─── Home Screen ──────────────────────────────────────────────────────────────
 const HomeScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
 
@@ -362,8 +403,8 @@ const HomeScreen = ({ navigation }) => {
   const [sortBy, setSortBy] = useState('earliest');
 
   const sortOptions = [
-    { key: 'earliest', label: 'Earliest' },
-    { key: 'lowest_price', label: 'Lowest\nPrice' },
+    { key: 'earliest',       label: 'Earliest'        },
+    { key: 'lowest_price',   label: 'Lowest\nPrice'   },
     { key: 'highest_rating', label: 'Highest\nRating' },
   ];
 
@@ -371,6 +412,7 @@ const HomeScreen = ({ navigation }) => {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={C.background} />
 
+      {/* Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.topBarBtn} onPress={() => setPanelOpen(true)}>
           <IconIon name="reorder-three-sharp" size={28} color={C.primary} />
@@ -385,6 +427,7 @@ const HomeScreen = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Search Card */}
         <View style={styles.searchCard}>
           <Text style={styles.searchCardTitle}>Find your next ride</Text>
 
@@ -446,24 +489,20 @@ const HomeScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
+        {/* Sort Row */}
         <View style={styles.sortRow}>
           <Text style={styles.sortLabel}>Sort by:</Text>
           {sortOptions.map(opt => (
             <TouchableOpacity
               key={opt.key}
-              style={[
-                styles.sortChip,
-                sortBy === opt.key && styles.sortChipActive,
-              ]}
+              style={[styles.sortChip, sortBy === opt.key && styles.sortChipActive]}
               onPress={() => setSortBy(opt.key)}
               activeOpacity={0.8}
             >
               <Text
                 style={[
                   styles.sortChipText,
-                  sortBy === opt.key
-                    ? styles.sortChipTextActive
-                    : styles.sortChipTextInactive,
+                  sortBy === opt.key ? styles.sortChipTextActive : styles.sortChipTextInactive,
                 ]}
                 numberOfLines={2}
               >
@@ -473,6 +512,7 @@ const HomeScreen = ({ navigation }) => {
           ))}
         </View>
 
+        {/* Ride Cards */}
         {RIDES.map(ride => (
           <RideCard key={ride.id} ride={ride} navigation={navigation} />
         ))}
@@ -480,7 +520,10 @@ const HomeScreen = ({ navigation }) => {
         <View style={{ height: 16 }} />
       </ScrollView>
 
+      {/* ── Bottom Navigation ── */}
       <View style={[styles.bottomNav, { paddingBottom: insets.bottom || 8 }]}>
+
+        {/* Home */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => setActiveNav('home')}
@@ -490,15 +533,17 @@ const HomeScreen = ({ navigation }) => {
           <Text style={[styles.navLabel, activeNav === 'home' && styles.navLabelActive]}>Home</Text>
         </TouchableOpacity>
 
+        {/* My Rides */}
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => setActiveNav('rides')}
+          onPress={() => { setActiveNav('rides'); navigation.navigate('ActiveTrip'); }}
           activeOpacity={0.7}
         >
           <IconMCI name="car-outline" size={26} color={activeNav === 'rides' ? C.primary : C.dark} />
           <Text style={[styles.navLabel, activeNav === 'rides' && styles.navLabelActive]}>Rides</Text>
         </TouchableOpacity>
 
+        {/* Post */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => setActiveNav('post')}
@@ -510,6 +555,21 @@ const HomeScreen = ({ navigation }) => {
           <Text style={[styles.navLabel, activeNav === 'post' && styles.navLabelActive]}>Post</Text>
         </TouchableOpacity>
 
+        {/* ── Wallet (NEW) ── */}
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => { setActiveNav('wallet'); navigation.navigate('Wallet'); }}
+          activeOpacity={0.7}
+        >
+          <IconMCI
+            name="wallet-outline"
+            size={26}
+            color={activeNav === 'wallet' ? C.primary : C.dark}
+          />
+          <Text style={[styles.navLabel, activeNav === 'wallet' && styles.navLabelActive]}>Wallet</Text>
+        </TouchableOpacity>
+
+        {/* Profile */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => setActiveNav('profile')}
@@ -518,9 +578,15 @@ const HomeScreen = ({ navigation }) => {
           <Icon name="person" size={26} color={activeNav === 'profile' ? C.primary : C.dark} />
           <Text style={[styles.navLabel, activeNav === 'profile' && styles.navLabelActive]}>Profile</Text>
         </TouchableOpacity>
+
       </View>
 
-      <SidePanel visible={panelOpen} onClose={() => setPanelOpen(false)} />
+      {/* Sidebar */}
+      <SidePanel
+        visible={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        navigation={navigation}
+      />
     </View>
   );
 };
@@ -563,19 +629,11 @@ const styles = StyleSheet.create({
   sortRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 8 },
   sortLabel: { fontSize: 13, fontWeight: '600', color: C.dark, flexShrink: 0 },
   sortChip: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: C.neutral,
-    borderRadius: 50,
-    paddingHorizontal: 8, paddingVertical: 7,
-    backgroundColor: C.white,
-    alignItems: 'center', justifyContent: 'center',
-    minHeight: 40,
+    flex: 1, borderWidth: 1.5, borderColor: C.neutral, borderRadius: 50,
+    paddingHorizontal: 8, paddingVertical: 7, backgroundColor: C.white,
+    alignItems: 'center', justifyContent: 'center', minHeight: 40,
   },
-  sortChipActive: {
-    backgroundColor: C.seaGreen,
-    borderColor: C.primary,
-  },
+  sortChipActive: { backgroundColor: C.seaGreen, borderColor: C.primary },
   sortChipText: { fontSize: 12, fontWeight: '500', textAlign: 'center' },
   sortChipTextActive: { color: C.primary, fontWeight: '700' },
   sortChipTextInactive: { color: C.sortText },
@@ -587,8 +645,8 @@ const styles = StyleSheet.create({
   },
   navItem: {
     alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 6, paddingHorizontal: 14,
-    borderRadius: 10, gap: 3, minWidth: 64, minHeight: 52,
+    paddingVertical: 6, paddingHorizontal: 10,
+    borderRadius: 10, gap: 3, minWidth: 56, minHeight: 52,
   },
   navLabel: { fontSize: 11, color: C.dark },
   navLabelActive: { color: C.primary, fontWeight: '600' },

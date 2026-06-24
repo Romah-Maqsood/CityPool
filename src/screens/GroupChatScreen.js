@@ -36,9 +36,8 @@ const C = {
   // Sent bubble — dark teal (user's own)
   bubbleSent:     '#006A61',
   sentText:       '#FFFFFF',
-  // Verified banner
-  verifiedBg:     '#E8FDF8',
-  verifiedBorder: '#B2EFE3',
+  // Verified banner — sea-green tint, no border
+  verifiedBg:     '#CFF5EC',
   verifiedText:   '#006A61',
   // Date pill
   datePill:       '#DDE0EE',
@@ -47,9 +46,10 @@ const C = {
   sendBtn:        '#006A61',
   onlineGreen:    '#22C55E',
   encryptedText:  '#9BA3AF',
-  // Trip info button
-  tripInfoBg:     '#EEF2FF',
-  tripInfoText:   '#3B4A9E',
+  // Trip info button — blue background, green icon, black text
+  tripInfoBg:     '#D3E4FE',
+  tripInfoIcon:   '#006A61',
+  tripInfoText:   '#0B1C30',
   // Sender label
   senderLabel:    '#6B7280',
 };
@@ -117,7 +117,7 @@ const VerifiedBanner = ({ text }) => (
 // ─── Driver / Passenger Bubble (left side) ────────────────────────────────────
 const LeftBubble = ({ senderName, text, time, avatarKey }) => (
   <View style={st.leftWrapper}>
-    {/* Sender name above bubble */}
+    {/* Sender name above the row, flush left — aligns with the avatar, not the bubble */}
     {senderName ? <Text style={st.senderName}>{senderName}</Text> : null}
     <View style={st.leftRow}>
       {/* Small avatar bottom-left */}
@@ -248,7 +248,7 @@ const GroupChatScreen = ({ navigation }) => {
 
         {/* Title + participants */}
         <View style={st.headerCenter}>
-          <Text style={st.headerTitle} numberOfLines={1}>
+          <Text style={st.headerTitle}>
             Trip: Lahore to Islamabad Group
           </Text>
           <ParticipantAvatars />
@@ -256,7 +256,7 @@ const GroupChatScreen = ({ navigation }) => {
 
         {/* Trip Info button */}
         <TouchableOpacity style={st.tripInfoBtn}>
-          <Icon name="info-outline" size={18} color={C.tripInfoText} />
+          <Icon name="info-outline" size={20} color={C.tripInfoIcon} />
           <Text style={st.tripInfoText}>Trip{'\n'}Info</Text>
         </TouchableOpacity>
       </View>
@@ -375,9 +375,11 @@ const st = StyleSheet.create({
   backBtn: { padding: 4, marginRight: 8, alignSelf: 'center' },
   headerCenter: { flex: 1 },
   headerTitle: {
+    // No numberOfLines clamp — reference design wraps this to 2 lines
     fontSize: 15,
     fontWeight: '700',
     color: C.dark,
+    lineHeight: 19,
     marginBottom: 4,
   },
   // Participant avatar cluster
@@ -409,23 +411,22 @@ const st = StyleSheet.create({
     color: C.mutedText,
     marginLeft: 80,   // offset past the 4 stacked avatars
   },
-  // Trip Info button
+  // Trip Info button — icon + 2-line label side by side, inside one pill
   tripInfoBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: C.tripInfoBg,
-    borderRadius: 12,
+    borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginLeft: 8,
-    minWidth: 52,
+    gap: 6,
   },
   tripInfoText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     color: C.tripInfoText,
-    textAlign: 'center',
-    marginTop: 2,
+    lineHeight: 13,
   },
 
   // ── Message list ──
@@ -446,14 +447,12 @@ const st = StyleSheet.create({
   },
   datePillText: { fontSize: 12, color: C.mutedText, fontWeight: '600', letterSpacing: 0.5 },
 
-  // Verified banner
+  // Verified banner — solid sea-green pill, no stroke
   verifiedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     backgroundColor: C.verifiedBg,
-    borderWidth: 1,
-    borderColor: C.verifiedBorder,
     borderRadius: 50,
     paddingHorizontal: 14,
     paddingVertical: 7,
@@ -478,7 +477,8 @@ const st = StyleSheet.create({
     fontWeight: '600',
     color: C.senderLabel,
     marginBottom: 4,
-    marginLeft: AVATAR_SIZE + 8,
+    // Aligns flush with the avatar's left edge (not the bubble) — matches reference
+    marginLeft: 0,
   },
   leftRow: {
     flexDirection: 'row',
@@ -502,7 +502,10 @@ const st = StyleSheet.create({
     borderTopLeftRadius: 4,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    flex: 1,
+    // flexShrink (not flex:1) — the row's width is content-based ("shrink to fit"
+    // via leftWrapper's alignSelf:'flex-start' + maxWidth), so flex:1 has nothing
+    // determinate to grow into and collapses to ~0, wrapping text one letter per line.
+    flexShrink: 1,
   },
   leftText: {
     fontSize: 14,
@@ -558,7 +561,7 @@ const st = StyleSheet.create({
     borderRadius: 16,
     borderTopLeftRadius: 4,
     overflow: 'hidden',
-    flex: 1,
+    flexShrink: 1,
   },
   carImage: {
     width: '100%',

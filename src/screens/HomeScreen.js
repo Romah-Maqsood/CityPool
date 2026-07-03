@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,15 @@ import {
   Pressable,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconMCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import IconIon from 'react-native-vector-icons/Ionicons';
+import { listAllRides } from '../services/rideService';
+import { getUser, getRefreshToken, removeToken } from '../utils/tokenStorage';
+import { logout } from '../services/authService';
 
 const C = {
   white: '#FFFFFF',
@@ -40,72 +44,46 @@ const C = {
 const { width: SW } = Dimensions.get('window');
 const PANEL_W = SW * 0.78;
 
-const RIDES = [
-  {
-    id: '1',
-    name: 'Ahmed Khan',
-    image: require('../assets/images/ahmed-khan.png'),
-    rating: 4.8,
-    cnicVerified: true,
-    phoneVerified: true,
-    car: 'Toyota Corolla',
-    color: 'White',
-    departure: '09:30 AM',
-    arrival: '02:45 PM',
-    from: 'Islamabad',
-    to: 'Lahore',
-    price: 'PKR 1,250',
-    seats: '2 seats left',
-    badge: null,
-    cardBg: C.white,
-  },
-  {
-    id: '2',
-    name: 'Zubair Malik',
-    image: require('../assets/images/zubair-malik.png'),
-    rating: 4.9,
-    cnicVerified: true,
-    phoneVerified: false,
-    car: 'Honda Civic',
-    color: 'Silver',
-    departure: '11:00 AM',
-    arrival: '04:15 PM',
-    from: 'Islamabad',
-    to: 'Lahore',
-    price: 'PKR 1,400',
-    seats: '3 seats left',
-    badge: null,
-    cardBg: C.white,
-  },
-  {
-    id: '3',
-    name: 'Omar Farooq',
-    image: require('../assets/images/omar-farooq.png'),
-    rating: 5.0,
-    cnicVerified: true,
-    phoneVerified: true,
-    car: 'KIA Sportage',
-    color: 'Black',
-    departure: '12:15 PM',
-    arrival: '04:45 PM',
-    from: 'Islamabad',
-    to: 'Lahore',
-    price: 'PKR 1,800',
-    seats: '1 seat left',
-    badge: 'FASTEST ROUTE',
-    cardBg: C.omarBg,
-  },
-];
+// Formats "2026-07-01T08:00:00.000Z" -> "08:00 AM"
+const formatTime = (isoString) => {
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '--:--';
+  }
+};
+
+// Maps a raw ride object from the API into the shape RideCard expects.
+// driver name/photo/car are placeholders until backend confirms those fields.
+const mapRideToCard = (ride) => ({
+  id: ride.id,
+  name: 'Driver',
+  image: require('../assets/images/profile-icon.png'),
+  rating: null,
+  cnicVerified: false,
+  phoneVerified: false,
+  car: 'Vehicle details pending',
+  color: '',
+  departure: formatTime(ride.departureAt),
+  arrival: '',
+  from: ride.fromCity,
+  to: ride.toCity,
+  price: `PKR ${ride.pricePerSeat}`,
+  seats: `${ride.availableSeats} seats left`,
+  badge: null,
+  cardBg: C.white,
+  pickupLabel: ride.pickupLabel,
+});
 
 // ─── Side Panel ───────────────────────────────────────────────────────────────
-const SidePanel = ({ visible, onClose, navigation }) => {
+const SidePanel = ({ visible, onClose, navigation, userName, handleLogout }) => {
   const insets = useSafeAreaInsets();
 
   const menuTop = [
     { icon: 'car-multiple',         label: 'My Rides',    screen: 'MyRides' },
     { icon: 'history',              label: 'Ride History', screen: null      },
     { icon: 'shield-check-outline', label: 'Verification', screen: null      },
-    // ── Payments now navigates to Wallet ──────────────────────────────────
     { icon: 'credit-card-outline',  label: 'Payments',    screen: 'Wallet'  },
   ];
 
@@ -149,7 +127,7 @@ const SidePanel = ({ visible, onClose, navigation }) => {
                 />
               </View>
               <View>
-                <Text style={panelSt.userName}>Ahmed Hassan</Text>
+                <Text style={panelSt.userName}>{userName || 'CityPool User'}</Text>
                 <View style={panelSt.verifiedRow}>
                   <IconMCI name="check-decagram" size={15} color={C.seaGreen} />
                   <Text style={panelSt.verifiedText}>Verified Member</Text>
@@ -176,7 +154,7 @@ const SidePanel = ({ visible, onClose, navigation }) => {
 
           <View style={panelSt.logoutSection}>
             <View style={panelSt.logoutDivider} />
-            <TouchableOpacity style={panelSt.logoutBtn} activeOpacity={0.7}>
+            <TouchableOpacity style={panelSt.logoutBtn} activeOpacity={0.7} onPress={handleLogout}>
               <IconMCI name="logout" size={20} color={C.red} />
               <Text style={panelSt.logoutText}>Logout</Text>
             </TouchableOpacity>
@@ -257,10 +235,12 @@ const RideCard = ({ ride, navigation }) => (
       <View style={cardSt.nameBlock}>
         <View style={cardSt.nameRatingRow}>
           <Text style={cardSt.driverName}>{ride.name}</Text>
-          <View style={cardSt.ratingPill}>
-            <IconMCI name="star" size={13} color={C.amber} />
-            <Text style={cardSt.ratingText}>{ride.rating}</Text>
-          </View>
+          {ride.rating && (
+            <View style={cardSt.ratingPill}>
+              <IconMCI name="star" size={13} color={C.amber} />
+              <Text style={cardSt.ratingText}>{ride.rating}</Text>
+            </View>
+          )}
         </View>
 
         <View style={cardSt.tagsRow}>
@@ -280,7 +260,7 @@ const RideCard = ({ ride, navigation }) => (
 
         <View style={cardSt.carRow}>
           <IconMCI name="car-outline" size={13} color={C.mutedText} />
-          <Text style={cardSt.carText}>{ride.car} • {ride.color}</Text>
+          <Text style={cardSt.carText}>{ride.car}</Text>
         </View>
       </View>
 
@@ -300,10 +280,14 @@ const RideCard = ({ ride, navigation }) => (
       </View>
       <Icon name="arrow-forward" size={18} color={C.dark} style={cardSt.arrow} />
       <View style={cardSt.timeBlock}>
-        <Text style={cardSt.time}>{ride.arrival}</Text>
+        <Text style={cardSt.time}>{ride.arrival || '--:--'}</Text>
         <Text style={cardSt.city}>{ride.to}</Text>
       </View>
     </View>
+
+    {ride.pickupLabel ? (
+      <Text style={cardSt.pickupText}>Pickup: {ride.pickupLabel}</Text>
+    ) : null}
 
     <View style={cardSt.cardDivider} />
 
@@ -315,7 +299,7 @@ const RideCard = ({ ride, navigation }) => (
       <TouchableOpacity
         style={cardSt.bookBtn}
         activeOpacity={0.85}
-        onPress={() => navigation.navigate('RideDetails')}
+        onPress={() => navigation.navigate('RideDetails', { rideId: ride.id })}
       >
         <Text style={cardSt.bookBtnText}>Book Now</Text>
       </TouchableOpacity>
@@ -376,11 +360,12 @@ const cardSt = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
-  timeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   timeBlock: { alignItems: 'flex-start' },
   time: { fontSize: 20, fontWeight: '800', color: C.dark },
   city: { fontSize: 11, color: C.mutedText, marginTop: 1 },
   arrow: { marginHorizontal: 10 },
+  pickupText: { fontSize: 11, color: C.mutedText, marginBottom: 10 },
   cardDivider: { height: 1, backgroundColor: C.lightBlue, marginBottom: 10, opacity: 0.6 },
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   priceBlock: { alignItems: 'flex-start' },
@@ -402,11 +387,72 @@ const HomeScreen = ({ navigation }) => {
   const [seats, setSeats] = useState('');
   const [sortBy, setSortBy] = useState('earliest');
 
+  const [rides, setRides] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [userName, setUserName] = useState('');
+
   const sortOptions = [
     { key: 'earliest',       label: 'Earliest'        },
     { key: 'lowest_price',   label: 'Lowest\nPrice'   },
     { key: 'highest_rating', label: 'Highest\nRating' },
   ];
+
+  const fetchRides = async (from = '', to = '') => {
+    setIsLoading(true);
+    setErrorMsg('');
+    try {
+      const result = await listAllRides(from, to);
+      console.log('Rides fetched:', result);
+      const mapped = (result.data || []).map(mapRideToCard);
+      setRides(mapped);
+    } catch (error) {
+      console.log('Fetch rides error:', error.response?.data || error.message);
+      setErrorMsg('Could not load rides. Pull down to retry.');
+      setRides([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRides();
+    (async () => {
+      const user = await getUser();
+      if (user?.fullName) setUserName(user.fullName);
+    })();
+  }, []);
+
+  const handleSearch = () => {
+    fetchRides(fromCity.trim(), toCity.trim());
+  };
+
+  const handleLogout = async () => {
+    try {
+      const refreshToken = await getRefreshToken();
+      if (refreshToken) {
+        const result = await logout(refreshToken);
+        console.log('Logout success:', result);
+      }
+    } catch (error) {
+      console.log('Logout API error:', error.response?.data || error.message);
+    } finally {
+      await removeToken();
+      setPanelOpen(false);
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    }
+  };
+
+  // client-side sort since backend doesn't support sort params yet
+  const sortedRides = [...rides].sort((a, b) => {
+    if (sortBy === 'lowest_price') {
+      return parseInt(a.price.replace(/\D/g, '')) - parseInt(b.price.replace(/\D/g, ''));
+    }
+    if (sortBy === 'earliest') {
+      return a.departure.localeCompare(b.departure);
+    }
+    return 0; // highest_rating: no rating data yet, skip
+  });
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -461,7 +507,7 @@ const HomeScreen = ({ navigation }) => {
               <IconMCI name="calendar-month-outline" size={18} color={C.neutral} style={styles.formIcon} />
               <TextInput
                 style={styles.formInput}
-                placeholder="dd/mm/yyyy"
+                placeholder="dd/mm/yyyy (not filtered yet)"
                 placeholderTextColor={C.neutral}
                 value={date}
                 onChangeText={setDate}
@@ -473,7 +519,7 @@ const HomeScreen = ({ navigation }) => {
               <Icon name="group" size={18} color={C.neutral} style={styles.formIcon} />
               <TextInput
                 style={[styles.formInput, { flex: 1 }]}
-                placeholder="Number of seats"
+                placeholder="Not filtered yet"
                 placeholderTextColor={C.neutral}
                 value={seats}
                 onChangeText={setSeats}
@@ -483,7 +529,7 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.searchBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.searchBtn} activeOpacity={0.85} onPress={handleSearch}>
             <Icon name="search" size={20} color={C.white} />
             <Text style={styles.searchBtnText}>Search</Text>
           </TouchableOpacity>
@@ -512,10 +558,18 @@ const HomeScreen = ({ navigation }) => {
           ))}
         </View>
 
-        {/* Ride Cards */}
-        {RIDES.map(ride => (
-          <RideCard key={ride.id} ride={ride} navigation={navigation} />
-        ))}
+        {/* Loading / Error / Empty / Rides */}
+        {isLoading ? (
+          <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 20 }} />
+        ) : errorMsg ? (
+          <Text style={styles.errorText}>{errorMsg}</Text>
+        ) : sortedRides.length === 0 ? (
+          <Text style={styles.emptyText}>No rides found for this route.</Text>
+        ) : (
+          sortedRides.map(ride => (
+            <RideCard key={ride.id} ride={ride} navigation={navigation} />
+          ))
+        )}
 
         <View style={{ height: 16 }} />
       </ScrollView>
@@ -523,7 +577,6 @@ const HomeScreen = ({ navigation }) => {
       {/* ── Bottom Navigation ── */}
       <View style={[styles.bottomNav, { paddingBottom: insets.bottom || 8 }]}>
 
-        {/* Home */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => setActiveNav('home')}
@@ -533,7 +586,6 @@ const HomeScreen = ({ navigation }) => {
           <Text style={[styles.navLabel, activeNav === 'home' && styles.navLabelActive]}>Home</Text>
         </TouchableOpacity>
 
-        {/* My Rides */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => { setActiveNav('rides'); navigation.navigate('ActiveTrip'); }}
@@ -543,7 +595,6 @@ const HomeScreen = ({ navigation }) => {
           <Text style={[styles.navLabel, activeNav === 'rides' && styles.navLabelActive]}>Rides</Text>
         </TouchableOpacity>
 
-        {/* Post */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => setActiveNav('post')}
@@ -555,7 +606,6 @@ const HomeScreen = ({ navigation }) => {
           <Text style={[styles.navLabel, activeNav === 'post' && styles.navLabelActive]}>Post</Text>
         </TouchableOpacity>
 
-        {/* ── Wallet (NEW) ── */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => { setActiveNav('wallet'); navigation.navigate('Wallet'); }}
@@ -569,7 +619,6 @@ const HomeScreen = ({ navigation }) => {
           <Text style={[styles.navLabel, activeNav === 'wallet' && styles.navLabelActive]}>Wallet</Text>
         </TouchableOpacity>
 
-        {/* Profile */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => setActiveNav('profile')}
@@ -586,6 +635,8 @@ const HomeScreen = ({ navigation }) => {
         visible={panelOpen}
         onClose={() => setPanelOpen(false)}
         navigation={navigation}
+        userName={userName}
+        handleLogout={handleLogout}
       />
     </View>
   );
@@ -637,6 +688,9 @@ const styles = StyleSheet.create({
   sortChipText: { fontSize: 12, fontWeight: '500', textAlign: 'center' },
   sortChipTextActive: { color: C.primary, fontWeight: '700' },
   sortChipTextInactive: { color: C.sortText },
+
+  errorText: { textAlign: 'center', color: C.red, marginTop: 20, fontSize: 13 },
+  emptyText: { textAlign: 'center', color: C.mutedText, marginTop: 20, fontSize: 13 },
 
   bottomNav: {
     flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',

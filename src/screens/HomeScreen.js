@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,121 +12,108 @@ import {
   Pressable,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Icon    from 'react-native-vector-icons/MaterialIcons';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconMCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import IconIon from 'react-native-vector-icons/Ionicons';
+import { listAllRides } from '../services/rideService';
+import { getUser, getRefreshToken, removeToken } from '../utils/tokenStorage';
+import { logout } from '../services/authService';
 
 const C = {
-  white:      '#FFFFFF',
-  primary:    '#006A61',
-  onSurface:  '#45464D',
-  dark:       '#0B1C30',
-  mutedText:  '#76777D',
-  neutral:    '#C6C6CD',
+  white: '#FFFFFF',
+  primary: '#006A61',
+  onSurface: '#45464D',
+  dark: '#0B1C30',
+  mutedText: '#76777D',
+  neutral: '#C6C6CD',
   background: '#F8F9FF',
-  darkCard:   '#131B2E',
-  amber:      '#B87500',
-  amberBg:    '#FFF3E0',
-  seaGreen:   '#89F5E7',
-  cnicBg:     '#E0F7F5',
-  red:        '#BA1A1A',
-  lightBlue:  '#D3E4FE',
-  omarBg:     '#DAE2FD',
-  sortText:   '#6B7280',
+  darkCard: '#131B2E',
+  amber: '#B87500',
+  amberBg: '#FFF3E0',
+  seaGreen: '#89F5E7',
+  cnicBg: '#E0F7F5',
+  red: '#BA1A1A',
+  lightBlue: '#D3E4FE',
+  omarBg: '#DAE2FD',
+  sortText: '#6B7280',
 };
 
 const { width: SW } = Dimensions.get('window');
 const PANEL_W = SW * 0.78;
 
-const RIDES = [
-  {
-    id: '1',
-    name: 'Ahmed Khan',
-    image: require('../assets/images/ahmed-khan.png'),
-    rating: 4.8,
-    cnicVerified: true,
-    phoneVerified: true,
-    car: 'Toyota Corolla',
-    color: 'White',
-    departure: '09:30 AM',
-    arrival: '02:45 PM',
-    from: 'Islamabad',
-    to: 'Lahore',
-    price: 'PKR 1,250',
-    seats: '2 seats left',
-    badge: null,
-    cardBg: C.white,
-  },
-  {
-    id: '2',
-    name: 'Zubair Malik',
-    image: require('../assets/images/zubair-malik.png'),
-    rating: 4.9,
-    cnicVerified: true,
-    phoneVerified: false,
-    car: 'Honda Civic',
-    color: 'Silver',
-    departure: '11:00 AM',
-    arrival: '04:15 PM',
-    from: 'Islamabad',
-    to: 'Lahore',
-    price: 'PKR 1,400',
-    seats: '3 seats left',
-    badge: null,
-    cardBg: C.white,
-  },
-  {
-    id: '3',
-    name: 'Omar Farooq',
-    image: require('../assets/images/omar-farooq.png'),
-    rating: 5.0,
-    cnicVerified: true,
-    phoneVerified: true,
-    car: 'KIA Sportage',
-    color: 'Black',
-    departure: '12:15 PM',
-    arrival: '04:45 PM',
-    from: 'Islamabad',
-    to: 'Lahore',
-    price: 'PKR 1,800',
-    seats: '1 seat left',
-    badge: 'FASTEST ROUTE',
-    cardBg: C.omarBg,
-  },
-];
+// Formats "2026-07-01T08:00:00.000Z" -> "08:00 AM"
+const formatTime = (isoString) => {
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '--:--';
+  }
+};
 
-const SidePanel = ({ visible, onClose }) => {
+// Maps a raw ride object from the API into the shape RideCard expects.
+// driver name/photo/car are placeholders until backend confirms those fields.
+const mapRideToCard = (ride) => ({
+  id: ride.id,
+  name: 'Driver',
+  image: require('../assets/images/profile-icon.png'),
+  rating: null,
+  cnicVerified: false,
+  phoneVerified: false,
+  car: 'Vehicle details pending',
+  color: '',
+  departure: formatTime(ride.departureAt),
+  arrival: '',
+  from: ride.fromCity,
+  to: ride.toCity,
+  price: `PKR ${ride.pricePerSeat}`,
+  seats: `${ride.availableSeats} seats left`,
+  badge: null,
+  cardBg: C.white,
+  pickupLabel: ride.pickupLabel,
+});
+
+// ─── Side Panel ───────────────────────────────────────────────────────────────
+const SidePanel = ({ visible, onClose, navigation, userName, handleLogout }) => {
   const insets = useSafeAreaInsets();
 
   const menuTop = [
-    { icon: 'history',              label: 'Ride History'  },
-    { icon: 'shield-check-outline', label: 'Verification'  },
-    { icon: 'credit-card-outline',  label: 'Payments'      },
-  ];
-  const menuBottom = [
-    { icon: 'cog-outline',          label: 'Settings'      },
-    { icon: 'help-circle-outline',  label: 'Help & Support'},
+    { icon: 'car-multiple',         label: 'My Rides',    screen: 'MyRides' },
+    { icon: 'history',              label: 'Ride History', screen: null      },
+    { icon: 'shield-check-outline', label: 'Verification', screen: null      },
+    { icon: 'credit-card-outline',  label: 'Payments',    screen: 'Wallet'  },
   ];
 
-  const MenuItem = ({ icon, label }) => (
-    <TouchableOpacity style={panelSt.menuItem} activeOpacity={0.7}>
+  const menuBottom = [
+    { icon: 'cog-outline',          label: 'Settings',     screen: null },
+    { icon: 'help-circle-outline',  label: 'Help & Support', screen: null },
+  ];
+
+  const MenuItem = ({ icon, label, screen }) => (
+    <TouchableOpacity
+      style={panelSt.menuItem}
+      activeOpacity={0.7}
+      onPress={() => {
+        if (screen) {
+          onClose();
+          navigation.navigate(screen);
+        }
+      }}
+    >
       <IconMCI name={icon} size={22} color={C.primary} />
       <Text style={panelSt.menuLabel}>{label}</Text>
     </TouchableOpacity>
   );
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={panelSt.overlay}>
         <Pressable style={panelSt.backdrop} onPress={onClose} />
         <View style={[panelSt.panel, { paddingBottom: insets.bottom || 24 }]}>
+
           <View style={[panelSt.header, { paddingTop: insets.top + 24 }]}>
             <TouchableOpacity onPress={onClose} style={panelSt.closeBtn}>
               <Icon name="close" size={22} color={C.white} />
@@ -140,7 +127,7 @@ const SidePanel = ({ visible, onClose }) => {
                 />
               </View>
               <View>
-                <Text style={panelSt.userName}>Ahmed Hassan</Text>
+                <Text style={panelSt.userName}>{userName || 'CityPool User'}</Text>
                 <View style={panelSt.verifiedRow}>
                   <IconMCI name="check-decagram" size={15} color={C.seaGreen} />
                   <Text style={panelSt.verifiedText}>Verified Member</Text>
@@ -151,7 +138,7 @@ const SidePanel = ({ visible, onClose }) => {
 
           <View style={panelSt.menuSection}>
             {menuTop.map(item => (
-              <MenuItem key={item.label} icon={item.icon} label={item.label} />
+              <MenuItem key={item.label} icon={item.icon} label={item.label} screen={item.screen} />
             ))}
           </View>
 
@@ -159,7 +146,7 @@ const SidePanel = ({ visible, onClose }) => {
 
           <View style={panelSt.menuSection}>
             {menuBottom.map(item => (
-              <MenuItem key={item.label} icon={item.icon} label={item.label} />
+              <MenuItem key={item.label} icon={item.icon} label={item.label} screen={item.screen} />
             ))}
           </View>
 
@@ -167,11 +154,12 @@ const SidePanel = ({ visible, onClose }) => {
 
           <View style={panelSt.logoutSection}>
             <View style={panelSt.logoutDivider} />
-            <TouchableOpacity style={panelSt.logoutBtn} activeOpacity={0.7}>
+            <TouchableOpacity style={panelSt.logoutBtn} activeOpacity={0.7} onPress={handleLogout}>
               <IconMCI name="logout" size={20} color={C.red} />
               <Text style={panelSt.logoutText}>Logout</Text>
             </TouchableOpacity>
           </View>
+
         </View>
       </View>
     </Modal>
@@ -179,15 +167,18 @@ const SidePanel = ({ visible, onClose }) => {
 };
 
 const panelSt = StyleSheet.create({
-  overlay:  { flex: 1, flexDirection: 'row' },
+  overlay: { flex: 1, flexDirection: 'row' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   panel: {
-    width: PANEL_W, backgroundColor: C.white,
-    position: 'absolute', left: 0, top: 0, bottom: 0,
+    width: PANEL_W,
+    backgroundColor: C.white,
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
   },
   header: {
     backgroundColor: C.darkCard,
-    paddingHorizontal: 20, paddingBottom: 28,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
     position: 'relative',
   },
   closeBtn: { position: 'absolute', top: 16, right: 16, padding: 4, zIndex: 10 },
@@ -196,25 +187,34 @@ const panelSt = StyleSheet.create({
     width: 64, height: 64, borderRadius: 32,
     overflow: 'hidden', borderWidth: 2.5, borderColor: C.seaGreen,
   },
-  avatar:       { width: '100%', height: '100%' },
-  userName:     { fontSize: 18, fontWeight: '700', color: C.white, marginBottom: 5 },
-  verifiedRow:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  avatar: { width: '100%', height: '100%' },
+  userName: { fontSize: 18, fontWeight: '700', color: C.white, marginBottom: 5 },
+  verifiedRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   verifiedText: { fontSize: 13, color: C.seaGreen, fontWeight: '500' },
-  menuSection:  { paddingVertical: 8, paddingHorizontal: 8 },
+  menuSection: { paddingVertical: 8, paddingHorizontal: 8 },
   menuItem: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 14, paddingHorizontal: 16,
     gap: 16, borderRadius: 10,
   },
-  menuLabel:      { fontSize: 15, color: C.dark, fontWeight: '500' },
-  sectionDivider: { height: 1, backgroundColor: C.lightBlue, marginHorizontal: 16, marginVertical: 4 },
-  logoutSection:  { paddingBottom: 8 },
-  logoutDivider:  { height: 1, backgroundColor: C.lightBlue, marginHorizontal: 16, marginBottom: 8 },
-  logoutBtn:      { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 24 },
-  logoutText:     { fontSize: 15, color: C.red, fontWeight: '600' },
+  menuLabel: { fontSize: 15, color: C.dark, fontWeight: '500' },
+  sectionDivider: {
+    height: 1, backgroundColor: C.lightBlue,
+    marginHorizontal: 16, marginVertical: 4,
+  },
+  logoutSection: { paddingBottom: 8 },
+  logoutDivider: {
+    height: 1, backgroundColor: C.lightBlue,
+    marginHorizontal: 16, marginBottom: 8,
+  },
+  logoutBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 14, paddingVertical: 14, paddingHorizontal: 24,
+  },
+  logoutText: { fontSize: 15, color: C.red, fontWeight: '600' },
 });
 
-// ─── CHANGE 1: RideCard now accepts navigation prop ───────────────────────────
+// ─── Ride Card ────────────────────────────────────────────────────────────────
 const RideCard = ({ ride, navigation }) => (
   <View style={[cardSt.card, { backgroundColor: ride.cardBg }]}>
 
@@ -235,10 +235,12 @@ const RideCard = ({ ride, navigation }) => (
       <View style={cardSt.nameBlock}>
         <View style={cardSt.nameRatingRow}>
           <Text style={cardSt.driverName}>{ride.name}</Text>
-          <View style={cardSt.ratingPill}>
-            <IconMCI name="star" size={13} color={C.amber} />
-            <Text style={cardSt.ratingText}>{ride.rating}</Text>
-          </View>
+          {ride.rating && (
+            <View style={cardSt.ratingPill}>
+              <IconMCI name="star" size={13} color={C.amber} />
+              <Text style={cardSt.ratingText}>{ride.rating}</Text>
+            </View>
+          )}
         </View>
 
         <View style={cardSt.tagsRow}>
@@ -258,9 +260,17 @@ const RideCard = ({ ride, navigation }) => (
 
         <View style={cardSt.carRow}>
           <IconMCI name="car-outline" size={13} color={C.mutedText} />
-          <Text style={cardSt.carText}>{ride.car} • {ride.color}</Text>
+          <Text style={cardSt.carText}>{ride.car}</Text>
         </View>
       </View>
+
+      <TouchableOpacity
+        style={cardSt.chatBtn}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('GroupChat')}
+      >
+        <IconMCI name="message-text-outline" size={20} color={C.primary} />
+      </TouchableOpacity>
     </View>
 
     <View style={cardSt.timeRow}>
@@ -270,10 +280,14 @@ const RideCard = ({ ride, navigation }) => (
       </View>
       <Icon name="arrow-forward" size={18} color={C.dark} style={cardSt.arrow} />
       <View style={cardSt.timeBlock}>
-        <Text style={cardSt.time}>{ride.arrival}</Text>
+        <Text style={cardSt.time}>{ride.arrival || '--:--'}</Text>
         <Text style={cardSt.city}>{ride.to}</Text>
       </View>
     </View>
+
+    {ride.pickupLabel ? (
+      <Text style={cardSt.pickupText}>Pickup: {ride.pickupLabel}</Text>
+    ) : null}
 
     <View style={cardSt.cardDivider} />
 
@@ -282,11 +296,10 @@ const RideCard = ({ ride, navigation }) => (
         <Text style={cardSt.price}>{ride.price}</Text>
         <Text style={cardSt.seats}>{ride.seats}</Text>
       </View>
-      {/* ── CHANGE 2: onPress navigates to RideDetails ── */}
       <TouchableOpacity
         style={cardSt.bookBtn}
         activeOpacity={0.85}
-        onPress={() => navigation.navigate('RideDetails')}
+        onPress={() => navigation.navigate('RideDetails', { rideId: ride.id })}
       >
         <Text style={cardSt.bookBtnText}>Book Now</Text>
       </TouchableOpacity>
@@ -299,7 +312,7 @@ const cardSt = StyleSheet.create({
   card: {
     borderRadius: 14, padding: 16, marginBottom: 12, position: 'relative',
     ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 6 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 6 },
       android: { elevation: 2 },
     }),
   },
@@ -309,62 +322,75 @@ const cardSt = StyleSheet.create({
     borderTopRightRadius: 14, borderBottomLeftRadius: 10,
     paddingHorizontal: 10, paddingVertical: 4,
   },
-  badgeText:     { fontSize: 10, fontWeight: '700', color: C.white, letterSpacing: 0.5 },
-  topRow:        { flexDirection: 'row', marginBottom: 10, gap: 12, alignItems: 'flex-start' },
+  badgeText: { fontSize: 10, fontWeight: '700', color: C.white, letterSpacing: 0.5 },
+  topRow: { flexDirection: 'row', marginBottom: 10, gap: 12, alignItems: 'flex-start' },
   avatarWrapper: { width: 52, height: 52, position: 'relative' },
-  avatar:        { width: 52, height: 52, borderRadius: 26 },
+  avatar: { width: 52, height: 52, borderRadius: 26 },
   verifiedDot: {
     position: 'absolute', bottom: -2, right: -4,
     backgroundColor: C.white, borderRadius: 10, padding: 1,
   },
-  nameBlock:     { flex: 1, paddingTop: 2 },
+  nameBlock: { flex: 1, paddingTop: 2 },
   nameRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' },
-  driverName:    { fontSize: 15, fontWeight: '700', color: C.dark },
+  driverName: { fontSize: 15, fontWeight: '700', color: C.dark },
   ratingPill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: C.amberBg, borderRadius: 6,
     paddingHorizontal: 6, paddingVertical: 2,
   },
-  ratingText:    { fontSize: 12, fontWeight: '700', color: C.amber },
-  tagsRow:       { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 5 },
+  ratingText: { fontSize: 12, fontWeight: '700', color: C.amber },
+  tagsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 5 },
   cnicTag: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: C.cnicBg, borderRadius: 5,
     paddingHorizontal: 6, paddingVertical: 2,
   },
-  cnicTagText:   { fontSize: 10, color: C.primary, fontWeight: '700' },
+  cnicTagText: { fontSize: 10, color: C.primary, fontWeight: '700' },
   phoneTag: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: C.background, borderRadius: 5,
     paddingHorizontal: 6, paddingVertical: 2,
   },
-  phoneTagText:  { fontSize: 10, color: C.mutedText, fontWeight: '600' },
-  carRow:        { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  carText:       { fontSize: 12, color: C.mutedText },
-  timeRow:       { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  timeBlock:     { alignItems: 'flex-start' },
-  time:          { fontSize: 20, fontWeight: '800', color: C.dark },
-  city:          { fontSize: 11, color: C.mutedText, marginTop: 1 },
-  arrow:         { marginHorizontal: 10 },
-  cardDivider:   { height: 1, backgroundColor: C.lightBlue, marginBottom: 10, opacity: 0.6 },
-  bottomRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  priceBlock:    { alignItems: 'flex-start' },
-  price:         { fontSize: 18, fontWeight: '800', color: C.primary },
-  seats:         { fontSize: 11, color: C.mutedText, marginTop: 2 },
-  bookBtn:       { backgroundColor: C.primary, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 22 },
-  bookBtnText:   { fontSize: 14, fontWeight: '700', color: C.white },
+  phoneTagText: { fontSize: 10, color: C.mutedText, fontWeight: '600' },
+  carRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  carText: { fontSize: 12, color: C.mutedText },
+  chatBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: C.cnicBg,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  timeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  timeBlock: { alignItems: 'flex-start' },
+  time: { fontSize: 20, fontWeight: '800', color: C.dark },
+  city: { fontSize: 11, color: C.mutedText, marginTop: 1 },
+  arrow: { marginHorizontal: 10 },
+  pickupText: { fontSize: 11, color: C.mutedText, marginBottom: 10 },
+  cardDivider: { height: 1, backgroundColor: C.lightBlue, marginBottom: 10, opacity: 0.6 },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  priceBlock: { alignItems: 'flex-start' },
+  price: { fontSize: 18, fontWeight: '800', color: C.primary },
+  seats: { fontSize: 11, color: C.mutedText, marginTop: 2 },
+  bookBtn: { backgroundColor: C.primary, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 22 },
+  bookBtnText: { fontSize: 14, fontWeight: '700', color: C.white },
 });
 
+// ─── Home Screen ──────────────────────────────────────────────────────────────
 const HomeScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
 
   const [activeNav, setActiveNav] = useState('home');
   const [panelOpen, setPanelOpen] = useState(false);
-  const [fromCity,  setFromCity]  = useState('');
-  const [toCity,    setToCity]    = useState('');
-  const [date,      setDate]      = useState('');
-  const [seats,     setSeats]     = useState('');
-  const [sortBy,    setSortBy]    = useState('earliest');
+  const [fromCity, setFromCity] = useState('');
+  const [toCity, setToCity] = useState('');
+  const [date, setDate] = useState('');
+  const [seats, setSeats] = useState('');
+  const [sortBy, setSortBy] = useState('earliest');
+
+  const [rides, setRides] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [userName, setUserName] = useState('');
 
   const sortOptions = [
     { key: 'earliest',       label: 'Earliest'        },
@@ -372,10 +398,67 @@ const HomeScreen = ({ navigation }) => {
     { key: 'highest_rating', label: 'Highest\nRating' },
   ];
 
+  const fetchRides = async (from = '', to = '') => {
+    setIsLoading(true);
+    setErrorMsg('');
+    try {
+      const result = await listAllRides(from, to);
+      console.log('Rides fetched:', result);
+      const mapped = (result.data || []).map(mapRideToCard);
+      setRides(mapped);
+    } catch (error) {
+      console.log('Fetch rides error:', error.response?.data || error.message);
+      setErrorMsg('Could not load rides. Pull down to retry.');
+      setRides([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRides();
+    (async () => {
+      const user = await getUser();
+      if (user?.fullName) setUserName(user.fullName);
+    })();
+  }, []);
+
+  const handleSearch = () => {
+    fetchRides(fromCity.trim(), toCity.trim());
+  };
+
+  const handleLogout = async () => {
+    try {
+      const refreshToken = await getRefreshToken();
+      if (refreshToken) {
+        const result = await logout(refreshToken);
+        console.log('Logout success:', result);
+      }
+    } catch (error) {
+      console.log('Logout API error:', error.response?.data || error.message);
+    } finally {
+      await removeToken();
+      setPanelOpen(false);
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    }
+  };
+
+  // client-side sort since backend doesn't support sort params yet
+  const sortedRides = [...rides].sort((a, b) => {
+    if (sortBy === 'lowest_price') {
+      return parseInt(a.price.replace(/\D/g, '')) - parseInt(b.price.replace(/\D/g, ''));
+    }
+    if (sortBy === 'earliest') {
+      return a.departure.localeCompare(b.departure);
+    }
+    return 0; // highest_rating: no rating data yet, skip
+  });
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={C.background} />
 
+      {/* Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.topBarBtn} onPress={() => setPanelOpen(true)}>
           <IconIon name="reorder-three-sharp" size={28} color={C.primary} />
@@ -390,6 +473,7 @@ const HomeScreen = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Search Card */}
         <View style={styles.searchCard}>
           <Text style={styles.searchCardTitle}>Find your next ride</Text>
 
@@ -399,6 +483,7 @@ const HomeScreen = ({ navigation }) => {
               <Icon name="location-on" size={18} color={C.neutral} style={styles.formIcon} />
               <TextInput
                 style={styles.formInput}
+                placeholder="Where are you leaving from?"
                 placeholderTextColor={C.neutral}
                 value={fromCity}
                 onChangeText={setFromCity}
@@ -410,6 +495,7 @@ const HomeScreen = ({ navigation }) => {
               <IconIon name="navigate-outline" size={18} color={C.neutral} style={styles.formIcon} />
               <TextInput
                 style={styles.formInput}
+                placeholder="Where are you going?"
                 placeholderTextColor={C.neutral}
                 value={toCity}
                 onChangeText={setToCity}
@@ -421,6 +507,7 @@ const HomeScreen = ({ navigation }) => {
               <IconMCI name="calendar-month-outline" size={18} color={C.neutral} style={styles.formIcon} />
               <TextInput
                 style={styles.formInput}
+                placeholder="dd/mm/yyyy (not filtered yet)"
                 placeholderTextColor={C.neutral}
                 value={date}
                 onChangeText={setDate}
@@ -432,6 +519,7 @@ const HomeScreen = ({ navigation }) => {
               <Icon name="group" size={18} color={C.neutral} style={styles.formIcon} />
               <TextInput
                 style={[styles.formInput, { flex: 1 }]}
+                placeholder="Not filtered yet"
                 placeholderTextColor={C.neutral}
                 value={seats}
                 onChangeText={setSeats}
@@ -441,30 +529,26 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.searchBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.searchBtn} activeOpacity={0.85} onPress={handleSearch}>
             <Icon name="search" size={20} color={C.white} />
             <Text style={styles.searchBtnText}>Search</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Sort Row */}
         <View style={styles.sortRow}>
           <Text style={styles.sortLabel}>Sort by:</Text>
           {sortOptions.map(opt => (
             <TouchableOpacity
               key={opt.key}
-              style={[
-                styles.sortChip,
-                sortBy === opt.key && styles.sortChipActive,
-              ]}
+              style={[styles.sortChip, sortBy === opt.key && styles.sortChipActive]}
               onPress={() => setSortBy(opt.key)}
               activeOpacity={0.8}
             >
               <Text
                 style={[
                   styles.sortChipText,
-                  sortBy === opt.key
-                    ? styles.sortChipTextActive
-                    : styles.sortChipTextInactive,
+                  sortBy === opt.key ? styles.sortChipTextActive : styles.sortChipTextInactive,
                 ]}
                 numberOfLines={2}
               >
@@ -474,15 +558,25 @@ const HomeScreen = ({ navigation }) => {
           ))}
         </View>
 
-        {/* ── CHANGE 3: pass navigation into each RideCard ── */}
-        {RIDES.map(ride => (
-          <RideCard key={ride.id} ride={ride} navigation={navigation} />
-        ))}
+        {/* Loading / Error / Empty / Rides */}
+        {isLoading ? (
+          <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 20 }} />
+        ) : errorMsg ? (
+          <Text style={styles.errorText}>{errorMsg}</Text>
+        ) : sortedRides.length === 0 ? (
+          <Text style={styles.emptyText}>No rides found for this route.</Text>
+        ) : (
+          sortedRides.map(ride => (
+            <RideCard key={ride.id} ride={ride} navigation={navigation} />
+          ))
+        )}
 
         <View style={{ height: 16 }} />
       </ScrollView>
 
+      {/* ── Bottom Navigation ── */}
       <View style={[styles.bottomNav, { paddingBottom: insets.bottom || 8 }]}>
+
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => setActiveNav('home')}
@@ -494,7 +588,7 @@ const HomeScreen = ({ navigation }) => {
 
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => setActiveNav('rides')}
+          onPress={() => { setActiveNav('rides'); navigation.navigate('ActiveTrip'); }}
           activeOpacity={0.7}
         >
           <IconMCI name="car-outline" size={26} color={activeNav === 'rides' ? C.primary : C.dark} />
@@ -514,21 +608,42 @@ const HomeScreen = ({ navigation }) => {
 
         <TouchableOpacity
           style={styles.navItem}
+          onPress={() => { setActiveNav('wallet'); navigation.navigate('Wallet'); }}
+          activeOpacity={0.7}
+        >
+          <IconMCI
+            name="wallet-outline"
+            size={26}
+            color={activeNav === 'wallet' ? C.primary : C.dark}
+          />
+          <Text style={[styles.navLabel, activeNav === 'wallet' && styles.navLabelActive]}>Wallet</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
           onPress={() => setActiveNav('profile')}
           activeOpacity={0.7}
         >
           <Icon name="person" size={26} color={activeNav === 'profile' ? C.primary : C.dark} />
           <Text style={[styles.navLabel, activeNav === 'profile' && styles.navLabelActive]}>Profile</Text>
         </TouchableOpacity>
+
       </View>
 
-      <SidePanel visible={panelOpen} onClose={() => setPanelOpen(false)} />
+      {/* Sidebar */}
+      <SidePanel
+        visible={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        navigation={navigation}
+        userName={userName}
+        handleLogout={handleLogout}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  root:          { flex: 1, backgroundColor: C.background },
+  root: { flex: 1, backgroundColor: C.background },
   scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24 },
 
   topBar: {
@@ -537,7 +652,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.background,
     borderBottomWidth: 1, borderBottomColor: C.lightBlue,
   },
-  topBarBtn:   { padding: 4 },
+  topBarBtn: { padding: 4 },
   topBarTitle: { flex: 1, fontSize: 20, fontWeight: '700', color: C.dark, marginLeft: 10 },
 
   searchCard: {
@@ -553,7 +668,7 @@ const styles = StyleSheet.create({
     borderRadius: 8, paddingHorizontal: 10,
     height: 40, backgroundColor: C.background, marginBottom: 2,
   },
-  formIcon:  { marginRight: 8 },
+  formIcon: { marginRight: 8 },
   formInput: { flex: 1, fontSize: 14, color: C.dark, paddingVertical: 0 },
   searchBtn: {
     flexDirection: 'row', backgroundColor: C.primary,
@@ -565,23 +680,17 @@ const styles = StyleSheet.create({
   sortRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 8 },
   sortLabel: { fontSize: 13, fontWeight: '600', color: C.dark, flexShrink: 0 },
   sortChip: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: C.neutral,
-    borderRadius: 50,
-    paddingHorizontal: 8, paddingVertical: 7,
-    backgroundColor: C.white,
-    alignItems: 'center', justifyContent: 'center',
-    minHeight: 40,
+    flex: 1, borderWidth: 1.5, borderColor: C.neutral, borderRadius: 50,
+    paddingHorizontal: 8, paddingVertical: 7, backgroundColor: C.white,
+    alignItems: 'center', justifyContent: 'center', minHeight: 40,
   },
-  // ── CHANGE 4: added borderColor: C.primary for dark green stroke when active ──
-  sortChipActive: {
-    backgroundColor: C.seaGreen,
-    borderColor: C.primary,   // dark green stroke
-  },
-  sortChipText:         { fontSize: 12, fontWeight: '500', textAlign: 'center' },
-  sortChipTextActive:   { color: C.primary, fontWeight: '700' },
+  sortChipActive: { backgroundColor: C.seaGreen, borderColor: C.primary },
+  sortChipText: { fontSize: 12, fontWeight: '500', textAlign: 'center' },
+  sortChipTextActive: { color: C.primary, fontWeight: '700' },
   sortChipTextInactive: { color: C.sortText },
+
+  errorText: { textAlign: 'center', color: C.red, marginTop: 20, fontSize: 13 },
+  emptyText: { textAlign: 'center', color: C.mutedText, marginTop: 20, fontSize: 13 },
 
   bottomNav: {
     flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
@@ -590,11 +699,11 @@ const styles = StyleSheet.create({
   },
   navItem: {
     alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 6, paddingHorizontal: 14,
-    borderRadius: 10, gap: 3, minWidth: 64, minHeight: 52,
+    paddingVertical: 6, paddingHorizontal: 10,
+    borderRadius: 10, gap: 3, minWidth: 56, minHeight: 52,
   },
-  navLabel:         { fontSize: 11, color: C.dark },
-  navLabelActive:   { color: C.primary, fontWeight: '600' },
+  navLabel: { fontSize: 11, color: C.dark },
+  navLabelActive: { color: C.primary, fontWeight: '600' },
   postCircle: {
     width: 32, height: 32, borderRadius: 16,
     borderWidth: 1.5, borderColor: C.dark,

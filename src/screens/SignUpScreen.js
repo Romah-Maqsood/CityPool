@@ -13,9 +13,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { colors, typography, spacing, borderRadius } from '../constants/colors';
+import { registerPassenger } from '../services/authService';
+
+import { saveToken, saveRefreshToken, saveUser } from '../utils/tokenStorage';
+
 
 // Custom Input Component
-const CustomInput = ({ label, value, onChangeText, placeholder, iconName, error }) => {
+const CustomInput = ({ label, value, onChangeText, placeholder, iconName, error, secureTextEntry, keyboardType, autoCapitalize }) => {
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -27,11 +31,11 @@ const CustomInput = ({ label, value, onChangeText, placeholder, iconName, error 
         error && styles.inputWrapperError,
       ]}>
         {iconName && (
-          <Icon 
-            name={iconName} 
-            size={20} 
+          <Icon
+            name={iconName}
+            size={20}
             color={colors.placeholder}
-            style={styles.inputIcon} 
+            style={styles.inputIcon}
           />
         )}
         <TextInput
@@ -42,6 +46,9 @@ const CustomInput = ({ label, value, onChangeText, placeholder, iconName, error 
           placeholderTextColor={colors.placeholder}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
         />
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -58,7 +65,7 @@ const CustomButton = ({ title, onPress, loading, disabled }) => {
       disabled={disabled || loading}
       activeOpacity={0.8}
     >
-      <Text style={styles.buttonText}>{title}</Text>
+      <Text style={styles.buttonText}>{loading ? 'Creating Account...' : title}</Text>
       {!loading && (
         <Icon name="arrow-forward" size={18} color={colors.onSecondary} style={styles.buttonIcon} />
       )}
@@ -72,6 +79,7 @@ const SignUpScreen = ({ navigation }) => {
     fullName: '',
     phone: '',
     email: '',
+    password: '',
   });
   const [errors, setErrors] = useState({});
   const [isTermsChecked, setIsTermsChecked] = useState(false);
@@ -93,14 +101,20 @@ const SignUpScreen = ({ navigation }) => {
 
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
-    } else if (!/^\+?[\d\s-]{10,}$/.test(formData.phone.trim())) {
-      newErrors.phone = 'Enter a valid phone number';
+    } else if (!/^\+92[0-9]{10}$/.test(formData.phone.trim())) {
+      newErrors.phone = 'Enter number as +923XXXXXXXXX';
     }
 
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       newErrors.email = 'Enter a valid email address';
+    }
+
+    if (!formData.password.trim()) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.trim().length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
     }
 
     if (!isTermsChecked) {
@@ -111,13 +125,39 @@ const SignUpScreen = ({ navigation }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     if (!validateForm()) return;
     setIsLoading(true);
-    setTimeout(() => {
+
+    try {
+      const result = await registerPassenger(
+        formData.phone.trim(),
+        formData.fullName.trim(),
+        formData.email.trim(),
+        formData.password.trim()
+      );
+
+      console.log('Sign Up success:', result);
+
+      // Save token and user data for future authenticated requests
+      await saveToken(result.data.token);
+      await saveRefreshToken(result.data.refreshToken);
+      await saveUser({
+        id: result.data.id,
+        phone: result.data.phone,
+        fullName: result.data.fullName,
+        email: result.data.email,
+        role: result.data.role,
+      });
+
       setIsLoading(false);
-      console.log('Sign Up Data:', formData);
-    }, 1500);
+      navigation.navigate('Home'); // adjust if Personal Details screen is confirmed later
+    } catch (error) {
+      setIsLoading(false);
+      console.log('Sign Up error:', error.response?.data || error.message);
+      const backendMessage = error.response?.data?.message;
+      setErrors(prev => ({ ...prev, phone: backendMessage || 'Something went wrong. Try again.' }));
+    }
   };
 
   return (
@@ -161,7 +201,7 @@ const SignUpScreen = ({ navigation }) => {
               label="Phone Number"
               value={formData.phone}
               onChangeText={text => handleChange('phone', text)}
-              placeholder="+92 300 1234567"
+              placeholder="+923001234567"
               iconName="phone"
               keyboardType="phone-pad"
               error={errors.phone}
@@ -176,6 +216,17 @@ const SignUpScreen = ({ navigation }) => {
               keyboardType="email-address"
               autoCapitalize="none"
               error={errors.email}
+            />
+
+            <CustomInput
+              label="Password"
+              value={formData.password}
+              onChangeText={text => handleChange('password', text)}
+              placeholder="At least 8 characters"
+              iconName="lock-outline"
+              secureTextEntry
+              autoCapitalize="none"
+              error={errors.password}
             />
 
             {/* Terms Checkbox */}
@@ -318,8 +369,8 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 20,
   },
-  linkText: { 
-    color: colors.secondary, 
+  linkText: {
+    color: colors.secondary,
     fontWeight: '700',
   },
   termsError: {

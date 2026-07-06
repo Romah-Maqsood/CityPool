@@ -35,15 +35,19 @@ const C = {
   teal86: '#86F2E4',
 };
 
-// ─── RideDetailsScreen ────────────────────────────────────────────────────────
 const RideDetailsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+
+  // ── HANDLE REQUEST SEAT ── Navigates to RideConfirmed page
+  const handleRequestSeat = () => {
+    navigation.navigate('RideConfirmed');
+  };
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={C.white} />
 
-      {/* ── STICKY HEADER (No boxes, only icons) ── */}
+      {/* ── STICKY HEADER ── */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -181,7 +185,7 @@ const RideDetailsScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* ── CARD 4: Driver Notes (5 lines) ── */}
+        {/* ── CARD 4: Driver Notes ── */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Driver Notes</Text>
           <Text style={styles.notesText}>
@@ -189,7 +193,7 @@ const RideDetailsScreen = ({ navigation }) => {
           </Text>
         </View>
 
-        {/* ── CARD 5: Preferences (with bone icon for No Pets) ── */}
+        {/* ── CARD 5: Preferences ── */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Preferences</Text>
           <View style={styles.prefGrid}>
@@ -232,7 +236,8 @@ const RideDetailsScreen = ({ navigation }) => {
             <Text style={styles.fareTotalValue}>Rs. 1,900</Text>
           </View>
 
-          <TouchableOpacity style={styles.requestBtn} activeOpacity={0.85}>
+          {/* Request Seat Button - Navigates to RideConfirmed */}
+          <TouchableOpacity style={styles.requestBtn} onPress={handleRequestSeat} activeOpacity={0.85}>
             <Text style={styles.requestBtnText}>Request Seat</Text>
             <Icon name="chevron-right" size={20} color={C.white} />
           </TouchableOpacity>
@@ -283,13 +288,13 @@ const RideDetailsScreen = ({ navigation }) => {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* ── STICKY FOOTER: Total price in GREEN ── */}
+      {/* ── STICKY FOOTER ── */}
       <View style={[styles.stickyFooter, { paddingBottom: insets.bottom || 16 }]}>
         <View style={styles.footerLeft}>
           <Text style={styles.footerLabel}>Total per seat</Text>
           <Text style={styles.footerPrice}>Rs. 1,900</Text>
         </View>
-        <TouchableOpacity style={styles.footerBtn} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.footerBtn} onPress={handleRequestSeat} activeOpacity={0.85}>
           <Text style={styles.footerBtnText}>Request Seat</Text>
         </TouchableOpacity>
       </View>
@@ -297,12 +302,11 @@ const RideDetailsScreen = ({ navigation }) => {
   );
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.background },
   scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 16 },
 
-  // ── HEADER (No boxes) ──
+  // ── HEADER ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -498,7 +502,7 @@ const styles = StyleSheet.create({
   prefItem: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '45%' },
   prefText: { fontSize: 13, color: C.dark, fontWeight: '500', flex: 1 },
 
-  // ── RIDE FARE with Gray Stroke ──
+  // ── RIDE FARE ──
   fareCard: {
     backgroundColor: C.fareBg,
     borderWidth: 1,
@@ -545,7 +549,7 @@ const styles = StyleSheet.create({
   reviewText: { fontSize: 13, color: C.onSurface, lineHeight: 20 },
   reviewDivider: { height: 1, backgroundColor: C.lightBlue, marginVertical: 10 },
 
-  // ── STICKY FOOTER (Total price in GREEN) ──
+  // ── STICKY FOOTER ──
   stickyFooter: {
     flexDirection: 'row',
     alignItems: 'center',

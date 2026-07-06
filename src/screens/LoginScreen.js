@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { colors, typography, spacing, borderRadius } from '../constants/colors';
+import { sendOtp } from '../services/authService';
 
 const LoginScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -23,7 +24,7 @@ const LoginScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!phoneNumber.trim()) {
       setError('Phone number is required');
       return;
@@ -34,11 +35,23 @@ const LoginScreen = ({ navigation }) => {
     }
     setError('');
     setIsLoading(true);
-    setTimeout(() => {
+
+    // countryCode is "+92", phoneNumber is "3001234567" (no leading 0)
+    // API needs full format like +923001234567
+    const fullPhone = `${countryCode}${phoneNumber.trim()}`;
+
+    try {
+      const result = await sendOtp(fullPhone);
+      console.log('OTP sent:', result);
       setIsLoading(false);
-      console.log('Login with:', countryCode, phoneNumber);
-      navigation.navigate('RegisterVehicle');
-    }, 1500);
+      // API currently returns the OTP itself in result.data (SMS not hooked up yet)
+
+      navigation.navigate('OtpVerification', { phone: fullPhone });
+    } catch (err) {
+      setIsLoading(false);
+      console.log('Send OTP error:', err.response?.data || err.message);
+      setError(err.response?.data?.message || 'Something went wrong. Try again.');
+    }
   };
 
   const handleSocialLogin = (platform) => {
@@ -70,8 +83,8 @@ const LoginScreen = ({ navigation }) => {
 
             {/* Car Illustration with Full Image Shadow Overlay */}
             <View style={styles.imageContainer}>
-              <Image 
-                source={require('../assets/images/car-illustration.png')} 
+              <Image
+                source={require('../assets/images/car-illustration.png')}
                 style={styles.carImage}
                 resizeMode="cover"
               />
@@ -94,7 +107,7 @@ const LoginScreen = ({ navigation }) => {
               <View style={styles.phoneContainer}>
                 <Text style={styles.inputLabel}>Phone Number</Text>
                 <View style={styles.phoneInputWrapper}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.countryCodeContainer}
                     onPress={() => setShowCountryDropdown(!showCountryDropdown)}
                   >
@@ -122,7 +135,9 @@ const LoginScreen = ({ navigation }) => {
                 disabled={isLoading}
                 activeOpacity={0.8}
               >
-                <Text style={styles.continueButtonText}>Continue</Text>
+                <Text style={styles.continueButtonText}>
+                  {isLoading ? 'Sending...' : 'Continue'}
+                </Text>
                 <Icon name="arrow-forward" size={18} color={colors.onSecondary} />
               </TouchableOpacity>
 
@@ -133,21 +148,20 @@ const LoginScreen = ({ navigation }) => {
                 <View style={styles.orLine} />
               </View>
 
-              {/* Social Buttons - Using available icons */}
+              {/* Social Buttons */}
               <View style={styles.socialContainer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.socialButton}
                   onPress={() => handleSocialLogin('Google')}
                   activeOpacity={0.7}
                 >
-                  {/* Using "public" as Google icon alternative */}
                   <View style={styles.googleIconBg}>
                     <Icon name="public" size={20} color="#DB4437" />
                   </View>
                   <Text style={styles.socialButtonText}>Google</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.socialButton}
                   onPress={() => handleSocialLogin('Facebook')}
                   activeOpacity={0.7}
@@ -156,6 +170,16 @@ const LoginScreen = ({ navigation }) => {
                   <Text style={styles.socialButtonText}>Facebook</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+
+            {/* Log In Link (returning users) */}
+            <View style={styles.signupContainer}>
+              <Text style={styles.signupText}>
+                Already registered?{' '}
+                <Text style={styles.signupLink} onPress={() => navigation.navigate('LoginPassword')}>
+                  Log in
+                </Text>
+              </Text>
             </View>
 
             {/* Sign Up Link */}
@@ -187,8 +211,8 @@ const LoginScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  root: { 
-    flex: 1, 
+  root: {
+    flex: 1,
     backgroundColor: colors.background,
   },
   flex: { flex: 1 },
@@ -206,7 +230,6 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
     paddingBottom: spacing.md,
   },
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -219,7 +242,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.secondary,
   },
-  // Car Image
   imageContainer: {
     alignItems: 'center',
     marginBottom: spacing.lg,
@@ -239,7 +261,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.1)',
     borderRadius: borderRadius.lg,
   },
-  // Welcome Section
   welcomeContainer: {
     alignItems: 'center',
     marginBottom: spacing.lg,
@@ -256,7 +277,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  // Card Section
   card: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
@@ -276,7 +296,6 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  // Phone Input
   phoneContainer: {
     marginBottom: spacing.md,
   },
@@ -322,7 +341,6 @@ const styles = StyleSheet.create({
     color: colors.error,
     marginTop: spacing.xs,
   },
-  // Continue Button
   continueButton: {
     flexDirection: 'row',
     height: 52,
@@ -333,8 +351,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },
-  buttonDisabled: { 
-    backgroundColor: colors.neutral, 
+  buttonDisabled: {
+    backgroundColor: colors.neutral,
     opacity: 0.6,
   },
   continueButtonText: {
@@ -342,7 +360,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.onSecondary,
   },
-  // OR Section
   orContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -358,7 +375,6 @@ const styles = StyleSheet.create({
     color: colors.onSurfaceVariant,
     marginHorizontal: spacing.md,
   },
-  // Social Buttons
   socialContainer: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -386,20 +402,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.onSurface,
   },
-  // Sign Up
   signupContainer: {
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.xs,
   },
   signupText: {
     fontSize: 14,
     color: colors.onSurfaceVariant,
   },
-  signupLink: { 
-    color: colors.secondary, 
+  signupLink: {
+    color: colors.secondary,
     fontWeight: '600',
   },
-  // Security Footer
   securityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
